@@ -16,17 +16,6 @@ __device__ int* maskBuffer;
 int nWidth,nHeight,nSeg,nMaxSegs;
 bool cudaIsInitialized=false;
 
-
-// for SLIC segmentation
-int nClusterSize;
-int nClustersPerCol;
-int nClustersPerRow;
-int nBlocksPerCluster;
-int nBlocks;
-
-int nBlockWidth;
-int nBlockHeight;
-
 __device__ SLICClusterCenter* vSLICCenterList;
 bool slicIsInitialized=false;
 
@@ -51,17 +40,8 @@ __host__ void InitCUDA(int width, int height,int nSegment, SEGMETHOD eMethod)
 
 	if (!slicIsInitialized)
 	{
-		nClusterSize=(int)sqrt((float)iDivUp(nWidth*nHeight,nSeg));
-
-		nClustersPerCol=iDivUp(nHeight,nClusterSize);
-		nClustersPerRow=iDivUp(nWidth,nClusterSize);
-		nBlocksPerCluster=iDivUp(nClusterSize*nClusterSize,MAX_BLOCK_SIZE);
-		nSeg=nClustersPerCol*nClustersPerRow;
-		nMaxSegs=(iDivUp(nWidth,BLCK_SIZE)+1)*(iDivUp(nHeight,BLCK_SIZE)+1);
-		nBlocks=nSeg*nBlocksPerCluster;
-
-		nBlockWidth=nClusterSize;
-		nBlockHeight=iDivUp(nClusterSize,nBlocksPerCluster);
+		// MaxSegs should be same on initializeFastSeg()@FastImgSeg.cpp
+		nMaxSegs=(iDivUp(nWidth,BLCK_SIZE)*2)*(iDivUp(nHeight,BLCK_SIZE)*2);
 
 		// the actual number of segments
 		cudaMalloc((void**) &vSLICCenterList,nMaxSegs*sizeof(SLICClusterCenter));
@@ -99,10 +79,8 @@ __host__ void TerminateCUDA()
 	}
 }
 
-__host__ void CudaSegmentation( int nSegments, SEGMETHOD eSegmethod, double weight)
+__host__ void CudaSegmentation(SEGMETHOD eSegmethod, double weight)
 {
-	nSeg=nSegments;
-
 	switch (eSegmethod)
 	{
 	case SLIC :

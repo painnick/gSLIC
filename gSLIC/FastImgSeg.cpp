@@ -13,25 +13,7 @@ using namespace std;
 
 FastImgSeg::FastImgSeg(int w,int h, int d, int nSegments)
 {
-	int nMaxSegs=(iDivUp(w,BLCK_SIZE) + 1)*(iDivUp(h,BLCK_SIZE) + 1);
-	if(nMaxSegs < nSegments) {
-		printf("Max no. of segment is %d ", nMaxSegs);
-		exit(-1);
-	}
-
-	width=w;
-	height=h;
-	nSeg=nSegments;
-
-	segMask=(int*) malloc(width*height*sizeof(int));
-	markedImg=(unsigned char*)malloc(width*height*4*sizeof(unsigned char));
-
-	centerList=(SLICClusterCenter*)malloc(nMaxSegs*sizeof(SLICClusterCenter));
-
-	InitCUDA(width,height,nSegments,SLIC);
-
-	bImgLoaded=false;
-	bSegmented=false;
+	initializeFastSeg(w, d, nSegments);
 }
 
 FastImgSeg::FastImgSeg()
@@ -52,11 +34,14 @@ void FastImgSeg::changeClusterNum(int nSegments)
 
 void FastImgSeg::initializeFastSeg(int w,int h, int nSegments)
 {
-	int nMaxSegs=(iDivUp(w,BLCK_SIZE) + 1)*(iDivUp(h,BLCK_SIZE) + 1);
-	if(nMaxSegs < nSegments) {
-		printf("Max no. of segment is %d ", nMaxSegs);
-		exit(-1);
+	int nAvailSegs=(iDivUp(w,BLCK_SIZE))*(iDivUp(h,BLCK_SIZE));
+	if(nAvailSegs < nSegments) {
+		printf("Max no. of segment is %d\n", nAvailSegs);
+		nSegments = nAvailSegs;
 	}
+
+	// MaxSegs should be same on InitCUDA()@CudaSegEngine.cu
+	int nMaxSegs=(iDivUp(w,BLCK_SIZE)*2)*(iDivUp(h,BLCK_SIZE)*2);
 
 	width=w;
 	height=h;
@@ -96,7 +81,7 @@ void FastImgSeg::DoSegmentation(SEGMETHOD eMethod, double weight)
 	clock_t start,finish;
 
 	start=clock();
-	CudaSegmentation(nSeg,eMethod, weight);
+	CudaSegmentation(eMethod, weight);
 	finish=clock();
 	printf("clustering:%f ",(double)(finish-start)/CLOCKS_PER_SEC);
 
@@ -157,11 +142,11 @@ void FastImgSeg::Tool_GetMarkedImg()
 void FastImgSeg::Tool_GetFilledImg()
 {
 	if (!bSegmented)
-	{
 		return;
-	}
 
 	memcpy(markedImg,sourceImage,width*height*4*sizeof(unsigned char));
+
+	int nMaxSegs=(iDivUp(width,BLCK_SIZE)+1)*(iDivUp(height,BLCK_SIZE)+1);
 
 	for (int i=0;i<height;i++)
 	{
@@ -169,6 +154,11 @@ void FastImgSeg::Tool_GetFilledImg()
 		{
 			int mskIndex=i*width+j;
 			int centerIndex = segMask[mskIndex];
+
+			if(centerIndex >= nMaxSegs) {
+				printf("[%s:%d] centerIndex(%d) is greater than or equals nMaxSegs(%d)\n", __FILE__, __LINE__, centerIndex, nMaxSegs);
+				continue;
+			}
 
 			//============================================================
 			// Method 1
@@ -201,7 +191,6 @@ void FastImgSeg::Tool_GetFilledImg()
 		}
 	}
 
-	int nMaxSegs=(iDivUp(width,BLCK_SIZE)+1)*(iDivUp(height,BLCK_SIZE)+1);
 	for(int i = 0; i < nMaxSegs; i ++)
 	{
 		centerList[i].x1 = width;
@@ -218,7 +207,7 @@ void FastImgSeg::Tool_GetFilledImg()
 			int centerIndex = segMask[mskIndex];
 
 			if(centerIndex < 0 || centerIndex >= nMaxSegs)
-				printf("[Tool_GetFilledImg] (%d,%d) centerIndex is %d\n", j, i, centerIndex);
+				printf("[%s:%d] centerIndex(%d) of (x:%d, y:%d) is not between 0 and nMaxSegs(%d)\n", __FILE__, __LINE__, j, i, centerIndex, nMaxSegs);
 
 			SLICClusterCenter* center = &(centerList[centerIndex]);
 
@@ -281,51 +270,5 @@ void FastImgSeg::Tool_GetFilledImg()
 		markedImg[srcIndex*4 + 0] = 0;
 		markedImg[srcIndex*4 + 1] = 0;
 		markedImg[srcIndex*4 + 2] = 255;
-	}
-}
-
-void FastImgSeg::Tool_WriteMask2File(char* outFileName, bool writeBinary)
-{
-	if (!bSegmented)
-	{
-		return;
-	}
-
-	if (writeBinary)
-	{
-		ofstream outf;
-		outf.open(outFileName, ios::binary);
-
-		outf.write(reinterpret_cast<char*>(&width),sizeof(width));
-		outf.write(reinterpret_cast<char*>(&height),sizeof(height));
-
-		for (int i=0;i<height;i++)
-		{
-			for (int j=0;j<width;j++)
-			{
-				int mskIndex=i*width+j;
-				int idx=segMask[mskIndex];
-				outf.write(reinterpret_cast<char*>(&idx),sizeof(idx));
-			}
-		}
-		outf.close();
-	}
-	else
-	{
-		ofstream outf;
-
-		outf.open(outFileName);
-
-		for (int i=0;i<height;i++)
-		{
-			for (int j=0;j<width;j++)
-			{
-				int mskIndex=i*width+j;
-				int idx=segMask[mskIndex];
-				outf<<idx<<' ';
-			}
-			outf<<'\n';
-		}
-		outf.close();
 	}
 }

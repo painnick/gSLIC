@@ -22,12 +22,12 @@ __host__ void SLICImgSeg(int* maskBuffer, float4* floatBuffer,
 						 float weight);
 
 __global__ void kInitClusterCenters(float4* floatBuffer, 
-									int nWidth, int nHeight, int nSegs,  
+									int nWidth, int nHeight,
 									SLICClusterCenter* vSLICCenterList);
 
 __global__ void kIterateKmeans(int* maskBuffer, float4* floatBuffer, 
 							   int nWidth, int nHeight, int nSegs, int nClusterIdxStride, 
-							   SLICClusterCenter* vSLICCenterList, 
+							   SLICClusterCenter* vSLICCenterList, int listSize,
 							   bool bLabelImg, float weight);
 
 __global__ void kUpdateClusterCenters(float4* floatBuffer, int* maskBuffer,

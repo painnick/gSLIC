@@ -16,7 +16,7 @@ extern "C" __host__ void TerminateCUDA();
 extern "C" __host__ void CopyImgDeviceToHost(unsigned char* imgPixels, int width, int height);
 extern "C" __host__ void CopyMaskDeviceToHost(int* maskPixels);
 extern "C" __host__ void CopyCenterListDeviceToHost(SLICClusterCenter* centerList);
-extern "C" __host__ void CudaSegmentation(int nSegments, SEGMETHOD eSegmethod, double weight);
+extern "C" __host__ void CudaSegmentation(SEGMETHOD eSegmethod, double weight);
 
 
 #endif

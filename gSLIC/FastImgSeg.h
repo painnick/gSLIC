@@ -36,7 +36,6 @@ public:
 	void DoSegmentation(SEGMETHOD eMethod, double weight);
 	void Tool_GetMarkedImg();
 	void Tool_GetFilledImg();
-	void Tool_WriteMask2File(char* outFileName, bool writeBinary);
 };
 
 #endif
