@@ -11,6 +11,7 @@ public:
 	unsigned char* sourceImage;
 	unsigned char* markedImg;
 	int* segMask;
+	SLICClusterCenter* centerList;
 
 private:
 
@@ -34,6 +35,7 @@ public:
 	void LoadImg(unsigned char* imgP);
 	void DoSegmentation(SEGMETHOD eMethod, double weight);
 	void Tool_GetMarkedImg();
+	void Tool_GetFilledImg();
 	void Tool_WriteMask2File(char* outFileName, bool writeBinary);
 };
 

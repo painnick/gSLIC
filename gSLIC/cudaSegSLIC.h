@@ -12,12 +12,13 @@ typedef struct
 	float4 lab;
 	float2 xy;
 	int nPoints;
-
+	int x1, y1, x2, y2;
 }SLICClusterCenter;
 
-__host__ void SLICImgSeg(int* maskBuffer, float4* floatBuffer, 
+__host__ void SLICImgSeg(int* maskBuffer, float4* floatBuffer,
 						 int nWidth, int nHeight, int nSegs,  
-						 SLICClusterCenter* vSLICCenterList, 
+						 SLICClusterCenter* vSLICCenterList,
+						 int listSize,
 						 float weight);
 
 __global__ void kInitClusterCenters(float4* floatBuffer, 
@@ -31,7 +32,7 @@ __global__ void kIterateKmeans(int* maskBuffer, float4* floatBuffer,
 
 __global__ void kUpdateClusterCenters(float4* floatBuffer, int* maskBuffer,
 										  int nWidth, int nHeight, int nSegs,  
-										  SLICClusterCenter* vSLICCenterList);
+										  SLICClusterCenter* vSLICCenterList, int listSize);
 
 void enforceConnectivity(int* maskBuffer,int width, int height, int nSeg);
 

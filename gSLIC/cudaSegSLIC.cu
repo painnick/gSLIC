@@ -8,7 +8,8 @@ const int dy4[4] = { 0, -1,  0,  1};
 
 __host__ void SLICImgSeg(int* maskBuffer, float4* floatBuffer, 
 						 int nWidth, int nHeight, int nSegs,  
-						 SLICClusterCenter* vSLICCenterList, 
+						 SLICClusterCenter* vSLICCenterList,
+						 int listSize,
 						 float weight)
 {
 	int nClusterSize=(int)sqrt((float)iDivUp(nWidth*nHeight,nSegs));
@@ -21,54 +22,52 @@ __host__ void SLICImgSeg(int* maskBuffer, float4* floatBuffer,
 	int nBlockWidth=nClusterSize;
 	int nBlockHeight=iDivUp(nClusterSize,nBlocksPerCluster);
 	
-	dim3 ThreadPerBlock_init(nClustersPerRow); //x
 	dim3 BlockPerGrid_init(nClustersPerCol); //y
+	dim3 ThreadPerBlock_init(nClustersPerRow); //x
 	
+	dim3 BlockPerGrid(nBlocksPerCluster, nSeg);
 	dim3 ThreadPerBlock(nBlockWidth,nBlockHeight);
-	dim3 BlockPerGrid(nBlocksPerCluster,nSeg);
 
 	kInitClusterCenters<<<BlockPerGrid_init,ThreadPerBlock_init>>>(floatBuffer,nWidth,nHeight,nSegs,vSLICCenterList);
 
 	//5 iterations have already given good result
 	for (int i=0;i<5;i++)
 	{
-		kIterateKmeans<<<BlockPerGrid,ThreadPerBlock>>>(maskBuffer,floatBuffer,nWidth,nHeight,nSeg,nClustersPerRow,vSLICCenterList,true, weight);
-		kUpdateClusterCenters<<<BlockPerGrid_init,ThreadPerBlock_init>>>(floatBuffer,maskBuffer,nWidth,nHeight,nSeg,vSLICCenterList);
+		kIterateKmeans<<<BlockPerGrid,ThreadPerBlock>>>(maskBuffer,floatBuffer,nWidth,nHeight,nSeg,nClustersPerRow,vSLICCenterList,true,weight);
+		kUpdateClusterCenters<<<BlockPerGrid_init,ThreadPerBlock_init>>>(floatBuffer,maskBuffer,nWidth,nHeight,nSeg,vSLICCenterList,listSize);
 	}
-		kIterateKmeans<<<BlockPerGrid,ThreadPerBlock>>>(maskBuffer,floatBuffer,nWidth,nHeight,nSeg,nClustersPerRow,vSLICCenterList,true, weight);
-	
+
+	kIterateKmeans<<<BlockPerGrid,ThreadPerBlock>>>(maskBuffer,floatBuffer,nWidth,nHeight,nSeg,nClustersPerRow,vSLICCenterList,true, weight);
 }
 
 
 __global__ void kInitClusterCenters( float4* floatBuffer, int nWidth, int nHeight, int nSegs, SLICClusterCenter* vSLICCenterList )
 {
-
-	int blockWidth=nWidth/blockDim.x;
-	int blockHeight=nHeight/gridDim.x;
-
-	int clusterIdx=blockIdx.x*blockDim.x+threadIdx.x;
-	int offsetBlock = blockIdx.x * blockHeight * nWidth + threadIdx.x * blockWidth;
+	int clusterIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int offsetBlock = (blockIdx.x * nHeight * nWidth) / gridDim.x + (threadIdx.x * nWidth) / blockDim.x;
 
 	float2 avXY;
 
-	avXY.x=threadIdx.x*blockWidth + (float)blockWidth/2.0;
-	avXY.y=blockIdx.x*blockHeight + (float)blockHeight/2.0;
+	avXY.x = (threadIdx.x * nWidth) / blockDim.x + (float)(nWidth/blockDim.x) / 2.0f;
+	avXY.y = (blockIdx.x * nHeight) / gridDim.x + (float)(nHeight/gridDim.x) / 2.0f;
 
 	//use a single point to init center
-	int offset=offsetBlock + blockHeight/2 * nWidth+ blockWidth/2 ;
+	int offset = offsetBlock + (nHeight * nWidth) / gridDim.x / 2 + (nWidth / blockDim.x / 2);
 
 	float4 fPixel=floatBuffer[offset];
+
+	//if(clusterIdx >= nSegs)
+	//	printf("[kInitClusterCenters] out of index (nSegs:%d, clusterIdx:%d)", nSegs, clusterIdx);
 
 	vSLICCenterList[clusterIdx].lab=fPixel;
 	vSLICCenterList[clusterIdx].xy=avXY;
 	vSLICCenterList[clusterIdx].nPoints=0;
-	
 }
 
 __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer, 
-							   int nWidth, int nHeight, int nSegs,  int nClusterIdxStride, 
-							   SLICClusterCenter* vSLICCenterList, 
-							   bool bLabelImg, float weight)
+								int nWidth, int nHeight, int nSegs, int nClusterIdxStride,
+								SLICClusterCenter* vSLICCenterList,
+								bool bLabelImg, float weight)
 {
 
 	//for reading cluster centers
@@ -107,10 +106,14 @@ __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer,
 		if (threadIdx.x>=cBegin && threadIdx.x<=cEnd && threadIdx.y>=rBegin && threadIdx.y<=rEnd)
 		{
 			int cmprIdx=(blockRow+threadIdx.y-1)*nClusterIdxStride+(blockCol+threadIdx.x-1);
+			//if(cmprIdx >= nSegs)
+			//	printf("[kIterateKmeans] out of index (nSegs:%d, cmprIdx#1:%d)", nSegs, cmprIdx);
+
 			fShareLab[threadIdx.y][threadIdx.x]=vSLICCenterList[cmprIdx].lab;
 			fShareXY[threadIdx.y][threadIdx.x]=vSLICCenterList[cmprIdx].xy;
 		}
 	}
+
 	__syncthreads();
 
 	if (innerBlockHeightIdx>=blockWidth)
@@ -139,6 +142,8 @@ __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer,
 			for (int c=cBegin;c<=cEnd;c++)
 			{
 				int cmprIdx=(blockRow+r-1)*nClusterIdxStride+(blockCol+c-1);
+				//if(cmprIdx >= nSegs)
+				//	printf("[kIterateKmeans] out of index (nSegs:%d, cmprIdx#2:%d)", nSegs, cmprIdx);
 
 				//compute SLIC distance
 				float fDab=(fPoint.x-fShareLab[r][c].x)*(fPoint.x-fShareLab[r][c].x)
@@ -159,7 +164,6 @@ __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer,
 					nearestR=r;
 					nearestC=c;
 				}
-
 			}
 		}
 
@@ -167,12 +171,15 @@ __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer,
 		{
 			int pixelIdx=threadIdx.y*blockWidth+threadIdx.x;
 
-			pixelUpdateList[pixelIdx].lab=fPoint;
-			pixelUpdateList[pixelIdx].xy.x=fX;
-			pixelUpdateList[pixelIdx].xy.y=fY;
+			if(pixelIdx < MAX_BLOCK_SIZE)
+			{
+				pixelUpdateList[pixelIdx].lab=fPoint;
+				pixelUpdateList[pixelIdx].xy.x=fX;
+				pixelUpdateList[pixelIdx].xy.y=fY;
 
-			pixelUpdateIdx[pixelIdx].x=nearestC;
-			pixelUpdateIdx[pixelIdx].y=nearestR;
+				pixelUpdateIdx[pixelIdx].x=nearestC;
+				pixelUpdateIdx[pixelIdx].y=nearestR;
+			}
 			
 			if (bLabelImg)
 			{
@@ -184,16 +191,19 @@ __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer,
 	{
 		int pixelIdx=threadIdx.y*blockWidth+threadIdx.x;
 
-		pixelUpdateIdx[pixelIdx].x=-1;
-		pixelUpdateIdx[pixelIdx].y=-1;
-
+		if(pixelIdx < MAX_BLOCK_SIZE)
+		{
+			pixelUpdateIdx[pixelIdx].x=-1;
+			pixelUpdateIdx[pixelIdx].y=-1;
+		}
 	}
+
 	__syncthreads();
 }
 
 // from original SLIC
-void FindNext(const int* labels, int* nlabels, const int& height, const int& width, const int& h,	const int& w,
-					const int&	lab,	int*	xvec, int* yvec, int& count)
+void FindNext(const int* labels, int* nlabels, const int& height, const int& width, const int& h,const int& w,
+					const int& lab, int* xvec, int* yvec, int& count)
 {
 	int oldlab = labels[h*width+w];
 	for( int i = 0; i < 4; i++ )
@@ -204,6 +214,12 @@ void FindNext(const int* labels, int* nlabels, const int& height, const int& wid
 			int ind = y*width+x;
 			if(nlabels[ind] < 0 && labels[ind] == oldlab )
 			{
+				if(count >= (width * height))
+				{
+					printf("[FindNext] count is %d", count);
+					continue;
+				}
+
 				xvec[count] = x;
 				yvec[count] = y;
 				count++;
@@ -214,13 +230,17 @@ void FindNext(const int* labels, int* nlabels, const int& height, const int& wid
 	}
 }
 
-__global__ void kUpdateClusterCenters( float4* floatBuffer,int* maskBuffer, int nWidth, int nHeight, int nSegs, SLICClusterCenter* vSLICCenterList )
+__global__ void kUpdateClusterCenters( float4* floatBuffer,int* maskBuffer, int nWidth, int nHeight, int nSegs, SLICClusterCenter* vSLICCenterList, int listSize)
 {
 
 	int blockWidth=nWidth/blockDim.x;
 	int blockHeight=nHeight/gridDim.x;
 
 	int clusterIdx=blockIdx.x*blockDim.x+threadIdx.x;
+
+	//if(clusterIdx >= listSize)
+	//	printf("[kUpdateClusterCenters] (clusterIdx:%d, listSize:%d)", clusterIdx, listSize);
+
 	int offsetBlock = threadIdx.x * blockWidth+ blockIdx.x * blockHeight * nWidth;
 
 	float2 crntXY=vSLICCenterList[clusterIdx].xy;
@@ -246,7 +266,10 @@ __global__ void kUpdateClusterCenters( float4* floatBuffer,int* maskBuffer, int 
 	{
 		for (int j = xBegin; j < xEnd; j++)
 		{
-			int offset=j + i * nWidth;			
+			int offset=j + i * nWidth;
+			//if(offset >= nWidth * nHeight)
+			//	break;
+
 			float4 fPixel=floatBuffer[offset];
 			int pIdx=maskBuffer[offset];
 
@@ -331,8 +354,12 @@ void enforceConnectivity(int* maskBuffer,int width, int height, int nSeg)
 						nlabels[ind] = adjlabel;
 					}
 					lab--;
+					if(lab < 0)
+						printf("[enforceConnectivity] (lab:%d, nSeg:%d) - (x:%d,y:%d)\n", lab, nSeg, i % width, i / width);
 				}
 				lab++;
+				if(lab >= nSeg)
+					printf("[enforceConnectivity] (lab:%d, nSeg:%d) - (x:%d,y:%d)\n", lab, nSeg, i % width, i / width);
 			}
 			i++;
 		}
