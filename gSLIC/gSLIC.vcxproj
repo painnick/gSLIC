@@ -61,11 +61,17 @@
 copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
     <CudaCompile>
-      <Include>C:\ProgramData\NVIDIA Corporation\CUDA Samples\v5.0\common\inc;%(Include)</Include>
+      <Include>%(Include)</Include>
       <GenerateLineInfo>true</GenerateLineInfo>
       <Defines>WIN32</Defines>
       <CodeGeneration>compute_10,sm_10</CodeGeneration>
+      <Emulation>false</Emulation>
+      <GPUDebugInfo>true</GPUDebugInfo>
+      <FastMath>false</FastMath>
     </CudaCompile>
+    <CudaLink>
+      <GPUDebugInfo>true</GPUDebugInfo>
+    </CudaLink>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
