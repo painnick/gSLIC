@@ -29,19 +29,15 @@ __host__ void SLICImgSeg(int* maskBuffer, float4* floatBuffer,
 	dim3 ThreadPerBlock(nBlockWidth,nBlockHeight);
 
 	kInitClusterCenters<<<BlockPerGrid_init,ThreadPerBlock_init>>>(floatBuffer,nWidth,nHeight,vSLICCenterList);
-	cudaThreadSynchronize();
 
 	//5 iterations have already given good result
-	for (int i=0;i<1;i++)
+	for (int i=0;i<5;i++)
 	{
 		kIterateKmeans<<<BlockPerGrid,ThreadPerBlock>>>(maskBuffer,floatBuffer,nWidth,nHeight,nSeg,nClustersPerRow,vSLICCenterList,listSize,true,weight);
-		cudaThreadSynchronize();
 		kUpdateClusterCenters<<<BlockPerGrid_init,ThreadPerBlock_init>>>(floatBuffer,maskBuffer,nWidth,nHeight,nSeg,vSLICCenterList,listSize);
-		cudaThreadSynchronize();
 	}
 
 	kIterateKmeans<<<BlockPerGrid,ThreadPerBlock>>>(maskBuffer,floatBuffer,nWidth,nHeight,nSeg,nClustersPerRow,vSLICCenterList,listSize,true,weight);
-	cudaThreadSynchronize();
 }
 
 
@@ -141,10 +137,10 @@ __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer,
 			for (int c=cBegin;c<=cEnd;c++)
 			{
 				int cmprIdx=(blockRow+r-1)*nClusterIdxStride+(blockCol+c-1);
-				if(cmprIdx >= nSegs)
-					continue;
-				//if(cmprIdx >= nSegs)
-				//	printf("[kIterateKmeans] out of index (nSegs:%d, cmprIdx#2:%d)", nSegs, cmprIdx);
+				//if(cmprIdx >= nSegs) {
+				//	printf("[%s:%d] cmprIdx(%d) is greater than or equlas nSegs(%d)\n", __FILE__, __LINE__, cmprIdx, nSegs);
+				//	continue;
+				//}
 
 				//compute SLIC distance
 				float fDab=(fPoint.x-fShareLab[r][c].x)*(fPoint.x-fShareLab[r][c].x)
@@ -200,8 +196,8 @@ __global__ void kIterateKmeans( int* maskBuffer, float4* floatBuffer,
 void FindNext(const int* labels, int* nlabels, const int& height, const int& width, const int& h,const int& w,
 					const int& lab, int* xvec, int* yvec, int& count)
 {
-	if(count > 10000)
-		return;
+	//if(count > 10000)
+	//	return;
 
 	int oldlab = labels[h*width+w];
 	for( int i = 0; i < 4; i++ )
@@ -212,11 +208,10 @@ void FindNext(const int* labels, int* nlabels, const int& height, const int& wid
 			int ind = y*width+x;
 			if(nlabels[ind] < 0 && labels[ind] == oldlab )
 			{
-				if(count >= (width * height))
-				{
-					printf("[FindNext] count is %d", count);
-					continue;
-				}
+				//if(count >= (width * height)) {
+				//	printf("[%s:%d] count(%d) is greater than or equlas (width:%d, height:%d)\n", __FILE__, __LINE__, count, width, height);
+				//	continue;
+				//}
 
 				xvec[count] = x;
 				yvec[count] = y;
@@ -236,8 +231,10 @@ __global__ void kUpdateClusterCenters( float4* floatBuffer,int* maskBuffer, int 
 
 	int clusterIdx=blockIdx.x*blockDim.x+threadIdx.x;
 
-	if(clusterIdx >= listSize)
-		return;
+	//if(clusterIdx >= listSize) {
+	//	printf("[%s:%d] clusterIdx(%d) is greater than or equlas listSize(%d)\n", __FILE__, __LINE__, clusterIdx, listSize);
+	//	return;
+	//}
 
 	int offsetBlock = threadIdx.x * blockWidth+ blockIdx.x * blockHeight * nWidth;
 
@@ -259,14 +256,15 @@ __global__ void kUpdateClusterCenters( float4* floatBuffer,int* maskBuffer, int 
 	int xEnd= nWidth > (crntXY.x + blockWidth) ? (crntXY.x + blockWidth) : (nWidth-1);
 
 	//update to cluster centers
-	// 
 	for (int i = yBegin; i < yEnd ; i++)
 	{
 		for (int j = xBegin; j < xEnd; j++)
 		{
 			int offset=j + i * nWidth;
-			if(offset >= nWidth * nHeight)
-				continue;
+			//if(offset >= nWidth * nHeight) {
+			//	printf("[%s:%d] offset(%d) is greater than or equlas (width:%d, height:%d)\n", __FILE__, __LINE__, offset, nWidth, nHeight);
+			//	continue;
+			//}
 
 			float4 fPixel=floatBuffer[offset];
 			int pIdx=maskBuffer[offset];
@@ -352,12 +350,12 @@ void enforceConnectivity(int* maskBuffer,int width, int height, int nSeg)
 						nlabels[ind] = adjlabel;
 					}
 					lab--;
-					if(lab < 0)
-						printf("[%s:%d] centerIndex(%d) (x:%d, y:%d)'s lab(%d) is less than 0\n", __FILE__, __LINE__, i % width, i / width, lab);
+					//if(lab < 0)
+					//	printf("[%s:%d] centerIndex(%d) (x:%d, y:%d)'s lab(%d) is less than 0\n", __FILE__, __LINE__, i % width, i / width, lab);
 				}
 				lab++;
-				if(lab >= nSeg)
-					printf("[%s:%d] centerIndex(%d) (x:%d, y:%d)'s lab(%d) is greater than or equals nSeg(%d)\n", __FILE__, __LINE__, i % width, i / width, lab, nSeg);
+				//if(lab >= nSeg)
+				//	printf("[%s:%d] centerIndex(%d) (x:%d, y:%d)'s lab(%d) is greater than or equals nSeg(%d)\n", __FILE__, __LINE__, i % width, i / width, lab, nSeg);
 			}
 			i++;
 		}

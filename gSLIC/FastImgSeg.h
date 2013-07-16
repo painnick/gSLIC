@@ -18,6 +18,7 @@ private:
 	int width;
 	int height;
 	int nSeg;
+	int nMaxSegs;
 
 	bool bSegmented;
 	bool bImgLoaded;
