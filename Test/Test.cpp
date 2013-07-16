@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 
+// Copy cvImage to memory buffer
 void CvImgToBuffer(IplImage* frame, unsigned char* imgBuffer) {
 	for (int i=0;i<frame->height;i++) {
 		for (int j=0;j<frame->width;j++) {
@@ -15,6 +16,7 @@ void CvImgToBuffer(IplImage* frame, unsigned char* imgBuffer) {
 	}
 }
 
+// Copy memory buffer to cvImage
 void OutputImgToCvImg(unsigned char* markedImg, IplImage* frame) {
 	for (int i=0;i<frame->height;i++) {
 		for (int j=0;j<frame->width;j++) {
@@ -30,7 +32,7 @@ int _tmain(int argc, _TCHAR* argv[]) {
 	IplImage* frame = cvLoadImage("photo.jpg");
 
 	FastImgSeg* mySeg = new FastImgSeg();
-	mySeg->initializeFastSeg(frame->width,frame->height, 7500 - 1);
+	mySeg->initializeFastSeg(frame->width,frame->height, 2000);
 
 	unsigned char* imgBuffer=(unsigned char*)malloc(frame->width * frame->height * sizeof(unsigned char) * 4);
 
@@ -45,14 +47,15 @@ int _tmain(int argc, _TCHAR* argv[]) {
 
 	mySeg->Tool_GetFilledImg();
 	//mySeg->Tool_GetMarkedImg();
+	//mySeg->Tool_DrawSites();
 
 	OutputImgToCvImg(mySeg->markedImg, frame);
 
 	cvShowImage("frame",frame);
 
-	cvSaveImage("photo_segmented.png", frame);
-
 	cvWaitKey(0);
+
+	cvSaveImage("photo_segmented.png", frame);
 
 	cvDestroyWindow( "frame" );
 

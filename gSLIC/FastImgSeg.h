@@ -37,6 +37,7 @@ public:
 	void DoSegmentation(SEGMETHOD eMethod, double weight);
 	void Tool_GetMarkedImg();
 	void Tool_GetFilledImg();
+	void Tool_DrawSites();
 };
 
 #endif

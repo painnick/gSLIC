@@ -71,6 +71,7 @@ void FastImgSeg::LoadImg(unsigned char* imgP)
 {
 	sourceImage=imgP;
 	CUDALoadImg(sourceImage);
+	memcpy(markedImg,sourceImage,width*height*4*sizeof(unsigned char));
 	bSegmented=false;
 }
 
@@ -86,10 +87,10 @@ void FastImgSeg::DoSegmentation(SEGMETHOD eMethod, double weight)
 	CopyMaskDeviceToHost(segMask);
 	CopyCenterListDeviceToHost(centerList);
 
-	start=clock();
-	enforceConnectivity(segMask,width,height,nMaxSegs);
-	finish=clock();
-	printf("connectivity:%f\n",(double)(finish-start)/CLOCKS_PER_SEC);
+	//start=clock();
+	//enforceConnectivity(segMask,width,height,nMaxSegs);
+	//finish=clock();
+	//printf("connectivity:%f\n",(double)(finish-start)/CLOCKS_PER_SEC);
 
 	bSegmented=true;
 }
@@ -98,8 +99,6 @@ void FastImgSeg::Tool_GetMarkedImg()
 {
 	if (!bSegmented)
 		return;
-
-	memcpy(markedImg,sourceImage,width*height*4*sizeof(unsigned char));
 
 	for (int i=1;i<height-1;i++) {
 		for (int j=1;j<width-1;j++) {
@@ -115,29 +114,12 @@ void FastImgSeg::Tool_GetMarkedImg()
 			}
 		}
 	}
-
-	// DRAW Center
-	for(int i = 0; i < nMaxSegs; i ++) {
-		float2 srcXY = centerList[i].xy;
-		int srcX = srcXY.x;
-		int srcY = srcXY.y;
-
-		if(0 <= srcX && srcX < width && 0 <= srcY && srcY < height) {
-			int srcIndex = srcY*width+srcX;
-
-			markedImg[srcIndex*4 + 0] = 255;
-			markedImg[srcIndex*4 + 1] = 255;
-			markedImg[srcIndex*4 + 2] = 255;
-		}
-	}
 }
 
 void FastImgSeg::Tool_GetFilledImg()
 {
 	if (!bSegmented)
 		return;
-
-	memcpy(markedImg,sourceImage,width*height*4*sizeof(unsigned char));
 
 	// Fill with lab color
 	for (int i=0;i<height;i++) {
@@ -164,6 +146,12 @@ void FastImgSeg::Tool_GetFilledImg()
 			markedImg[mskIndex*4 + 2] = r;
 		}
 	}
+}
+
+void FastImgSeg::Tool_DrawSites()
+{
+	if (!bSegmented)
+		return;
 
 	// DRAW Center
 	for(int i = 0; i < nMaxSegs; i ++) {
