@@ -47,16 +47,19 @@ __host__ void SLICImgSeg(int* maskBuffer, float4* floatBuffer,
 
 __global__ void kInitClusterCenters( float4* floatBuffer, int nWidth, int nHeight, SLICClusterCenter* vSLICCenterList )
 {
-	int clusterIdx = (blockIdx.x * blockDim.x) + threadIdx.x;
-	int offsetBlock = (blockIdx.x * nHeight * nWidth) / gridDim.x + (threadIdx.x * nWidth) / blockDim.x;
+	int blockWidth=nWidth/blockDim.x;
+	int blockHeight=nHeight/gridDim.x;
+
+	int clusterIdx=blockIdx.x*blockDim.x+threadIdx.x;
+	int offsetBlock = blockIdx.x * blockHeight * nWidth + threadIdx.x * blockWidth;
 
 	float2 avXY;
 
-	avXY.x = (threadIdx.x * nWidth) / blockDim.x + (float)(nWidth/blockDim.x) / 2.0f;
-	avXY.y = (blockIdx.x * nHeight) / gridDim.x + (float)(nHeight/gridDim.x) / 2.0f;
+	avXY.x=threadIdx.x*blockWidth + (float)blockWidth/2.0;
+	avXY.y=blockIdx.x*blockHeight + (float)blockHeight/2.0;
 
 	//use a single point to init center
-	int offset = offsetBlock + (nHeight * nWidth) / gridDim.x / 2 + (nWidth / blockDim.x / 2);
+	int offset=offsetBlock + blockHeight/2 * nWidth+ blockWidth/2 ;
 
 	float4 fPixel=floatBuffer[offset];
 
