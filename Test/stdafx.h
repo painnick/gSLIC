@@ -13,6 +13,7 @@
 
 #include "opencv\cv.h"
 #include "opencv\highgui.h"
+#include "opencv2\legacy\legacy.hpp"
 
 #include "..\gSLIC\FastImgSeg.h"
 

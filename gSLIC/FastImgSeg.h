@@ -12,13 +12,13 @@ public:
 	unsigned char* markedImg;
 	int* segMask;
 	SLICClusterCenter* centerList;
+	int nMaxSegs;
 
 private:
 
 	int width;
 	int height;
 	int nSeg;
-	int nMaxSegs;
 
 	bool bSegmented;
 	bool bImgLoaded;
