@@ -283,6 +283,9 @@ __global__ void kUpdateClusterCenters( float4* floatBuffer,int* maskBuffer, int 
 		}
 	}
 
+	if(nPoints == 0)
+		return;
+
 	avLab.x/=nPoints;
 	avLab.y/=nPoints;
 	avLab.z/=nPoints;
