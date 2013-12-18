@@ -39,8 +39,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v5.0\include;C:\opencv\build\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\opencv\build\x86\vc10\lib;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v5.0\lib\Win32;C:\Users\painnick\Documents\Visual Studio 2010\Projects\gSLIC\Debug;$(SolutionDir)$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(CUDA_INC_PATH);C:\opencv\build\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\opencv\build\x86\vc10\lib;$(CUDA_LIB_PATH)\..\Win32;C:\Users\painnick\Documents\Visual Studio 2010\Projects\gSLIC\Debug;$(SolutionDir)$(Configuration);$(LibraryPath)</LibraryPath>
     <IntDir>$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
